@@ -47,9 +47,10 @@ def setScale(scope, value, channel):
     return output
 
 def withinRange(short_record_length,data):
+    #1.02396875
     highcount = 0
     lowcount = 0
-    if( max(data)<=32767.0/1.02396875 or min(data)>=-32767.0/1.02396875):
+    if( max(data)<=32767.0/2 or min(data)>=-32767.0/2):
         lowcount = 1;
         
     for j in range(short_record_length):
@@ -165,7 +166,7 @@ def checkscale(scope, numchan, short_record_length, long_record_length):
         okayscale = 0
         while okayscale == 0:
             channel = i+1
-            set_channel(channel)
+            set_channel(scope,channel)
             okayscale = setScale(scope, withinRange(short_record_length,getRawData(scope)), channel)
             
 #    scope.write(":Horizontal:Scale "+str(hscale))
@@ -251,7 +252,7 @@ def read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, lo
     output = [times]
     for i in range(numchan):
         output+=[voltage[i]]
-    scope.close()
+    
     return output
 
 """
@@ -326,14 +327,14 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan):
     
     #startTime = time.time()
     for j in range(numcollects):
-        output += [mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_length)]
+        output += [read_and_write_data_from_Nch(scope,numchan, nstart, short_record_length, long_record_length)]
         time.sleep(pause)    
     
     finalOutput = [['?']*len(output) for i in range(numchan)]
     for k in range(numchan):
         for i in range(len(output)):
             finalOutput[k][i] = (output[i][0], output[i][1+k])
-    
+    scope.close()
     return finalOutput
 
 def opsensRead(numCollects):
@@ -423,14 +424,14 @@ def vnaRead(numTimes, start, end):
     output = [freq]+[real]+[imag]
     return output
 
-def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime): 
+def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime, run): 
     delay = 0.02;
     dataPointsForEachScopeRun = int(1.80/delay)
     ntimes = numCollects*int(dataPointsForEachScopeRun)
     scopeValues = [['?']*3 for i in range(numCollects)]
     tempValues = [[] for i in range(2)]
     
-    excelFilePath = addDirectory(filepath,'CompleteDataOscilloscopeTemp'+datetime+'.xlsx')
+    excelFilePath = addDirectory(filepath,'CompleteDataOscilloscopeTemp'+datetime+"Run"+run+'.xlsx')
     workbook = xlsxwriter.Workbook(excelFilePath)
     voltageWorksheet = []
     
@@ -497,6 +498,7 @@ def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime
             tempScopeWorksheet.write(i+1,0,i+1)
             tempScopeWorksheet.write(i+1,1,avgTemp[i])
     workbook.close()
+    return str(int(run)+1)
 
 def writeImpeadanceData(vnaData, filepath, datetime, coil):
     filepath = addDirectory(filepath,coil)
