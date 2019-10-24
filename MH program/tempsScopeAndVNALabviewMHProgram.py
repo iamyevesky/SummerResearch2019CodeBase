@@ -443,7 +443,7 @@ def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime
     runVTemp = Path(runVTemp)
     timeVVoltage = []
     for i in range(len(scopeValues)):
-        timeVVoltage.append(Path(addDirectory(scopeFilePath,'voltageDataScopeRun'+datetime+'('+str(i+1)+')'+'.csv')))
+        timeVVoltage.append(Path(addDirectory(scopeFilePath,'voltageDataScopeRun'+datetime+"Run("+run+')'+"Cycle"+'('+str(i+1)+')'+'.csv')))
         voltageWorksheet.append(workbook.add_worksheet('voltageDataScopeRun'+str(i+1)))
     
     for k in range(numChan):
