@@ -13,6 +13,54 @@ from pathlib import Path
 import os
 import xlsxwriter
 
+def getRawData(scope):
+    return scope.query_ascii_values("CURVE?")
+
+def setScale(scope, value, channel):
+    chscale = float(scope.query("CH"+str(channel)+":SCALE?"))
+    output = 0
+    newchscale = chscale
+        
+    if value == -1:
+        if chscale in [0.001, 0.01, 0.1, 1.0, 0.005, 0.05, 0.5, 5.0]:
+            newchscale = chscale*2
+        elif chscale in [0.002, 0.02, 0.2, 2.0]:
+            newchscale = chscale*2.5
+        elif chscale == 10:
+            output = 1
+            print('CH'+str(channel)+': already at max scale')
+        
+    elif value == 1:
+        if chscale in [0.01, 0.1, 1.0, 10.0, 0.002, 0.02, 0.2, 2.0]:
+            newchscale = chscale/2
+        elif chscale in [ 0.005, 0.05, 0.5, 5.0]:
+            newchscale = chscale/2.5
+        elif chscale == 0.001:
+            output = 1
+            print('CH'+str(channel)+': already at min scale')
+        
+    elif value == 0:
+        output = 1;
+        
+    scope.write("CH"+str(channel)+":SCALE "+str(newchscale))
+    print('CH'+str(channel)+': changing scale from '+str(chscale)+' to '+str(newchscale))
+    return output
+
+def withinRange(short_record_length,data):
+    highcount = 0
+    lowcount = 0
+    if( max(data)<=32767.0/1.02396875 or min(data)>=-32767.0/1.02396875):
+        lowcount = 1;
+        
+    for j in range(short_record_length):
+        if ((data[j]>=32767.0) or (data[j]<=-32767.0)): #Why 32760?
+            highcount += 1
+    if float(highcount)/(float(short_record_length)) > 0.0001:
+        return -1
+    elif lowcount>0:
+        return 1
+    return 0
+
 """
 :brief Converts list data from scope to voltage values 
 :param list data type raw_rata contains the values recorded
@@ -106,65 +154,75 @@ def calc_wait_time(scope):
 :param int data type long_record_length: unexplained
 """
 def checkscale(scope, numchan, short_record_length, long_record_length):
-    base_record_length=int(scope.query(':HORIZONTAL:RECORDLENGTH?')) 
-    if short_record_length != base_record_length:
-        scope.write(':Horizontal:Recordlength '+str(short_record_length)) #Why?
-    hscale = 0.000000001*short_record_length*0.1 #Why?
-    scope.write(":Horizontal:Scale "+str(hscale))
-    #Sets the "from" part of the waveform to be captured. In this case from data point 1
+    scope.write(':Horizontal:Recordlength '+str(short_record_length))
+    hScale = 1*10^(-9)*short_record_length
+    scope.write(":Horizontal:Scale "+str(hScale))
     scope.write('DATA:START 1')
-    #Sets the "to" part of the waveform to be captured. In this case to the last recordrd data point
     scope.write('DATA:STOP '+str(short_record_length))
     scope.write('ACQUIRE:STOPAFTER RUnsTOP')
+    
     for i in range(numchan):
         okayscale = 0
         while okayscale == 0:
-            set_channel(scope, i+1)
-            scope.write("WFMOutpre:ENCdg ASCii")
-            data = scope.query_ascii_values("CURVE?")
-            highcount = 0
-            lowcount = 0
-            for j in range(short_record_length):
-                if data[j] > 32760: #Why 32760?
-                    highcount += 1
-                elif data[j] < 32760/5:
-                    lowcount += 1
-            if highcount/short_record_length > 0.0001:
-                chscale = float(scope.query("CH"+str(i+1)+":SCALE?"))
-                """
-                Oscilloscope has scales of 1mV, 2mV, 5mV, 0.1V, 0.2V, 0.5V up
-                to 10V in a pattern of 1,2,5.
-                To increase scale when it is a unit value of 1 or 5, multiply by 2
-                else multiply by 2.5.
-                If scale is at 10V, then that is the max.
-                """
-                if chscale in [0.001, 0.01, 0.1, 1.0, 0.005, 0.05, 0.5, 5.0]:
-                    newchscale = chscale*2
-                if chscale in [0.002, 0.02, 0.2, 2.0]:
-                    newchscale = chscale*2.5
-                if chscale == 10:
-                    okayscale = 1
-                    print('CH'+str(i+1)+': already at max scale')
-                    break                    
-                scope.write("CH"+str(i+1)+":SCALE "+str(newchscale))
-                print('CH'+str(i+1)+': changing scale from '+str(chscale)+' to '+str(newchscale))
-            if lowcount/short_record_length > 0.9999 and highcount/short_record_length < 0.0001:
-                chscale = float(scope.query("CH"+str(i+1)+":SCALE?"))
-                if chscale in [0.01, 0.1, 1.0, 10.0, 0.002, 0.02, 0.2, 2.0]:
-                    newchscale = chscale/2
-                if chscale in [ 0.005, 0.05, 0.5, 5.0]:
-                    newchscale = chscale/2.5
-                if chscale == 0.001:
-                    okayscale = 1
-                    print('CH'+str(i+1)+': already at min scale')
-                    break                     
-                scope.write("CH"+str(i+1)+":SCALE "+str(newchscale))
-                print('CH'+str(i+1)+': changing scale from '+str(chscale)+' to '+str(newchscale))
-            if highcount/short_record_length < 0.0001 and lowcount/short_record_length < 0.9999:
-                okayscale = 1
-        scope.write(":Horizontal:recordlength "+str(long_record_length))
-        hscale = 0.000000001*long_record_length*0.1
-        scope.write(":Horizontal:Scale "+str(hscale))
+            channel = i+1
+            set_channel(channel)
+            okayscale = setScale(scope, withinRange(short_record_length,getRawData(scope)), channel)
+            
+#    scope.write(":Horizontal:Scale "+str(hscale))
+#    #Sets the "from" part of the waveform to be captured. In this case from data point 1
+#    scope.write('DATA:START 1')
+#    #Sets the "to" part of the waveform to be captured. In this case to the last recordrd data point
+#    scope.write('DATA:STOP '+str(short_record_length))
+#    scope.write('ACQUIRE:STOPAFTER RUnsTOP')
+#    for i in range(numchan):
+#        okayscale = 0
+#        while okayscale == 0:
+#            set_channel(scope, i+1)
+#            scope.write("WFMOutpre:ENCdg ASCii")
+#            data = scope.query_ascii_values("CURVE?")
+#            highcount = 0
+#            lowcount = 0
+#            for j in range(short_record_length):
+#                if data[j] > 32760: #Why 32760?
+#                    highcount += 1
+#                elif data[j] < 32760/5:
+#                    lowcount += 1
+#            if highcount/short_record_length > 0.0001:
+#                chscale = float(scope.query("CH"+str(i+1)+":SCALE?"))
+#                """
+#                Oscilloscope has scales of 1mV, 2mV, 5mV, 0.1V, 0.2V, 0.5V up
+#                to 10V in a pattern of 1,2,5.
+#                To increase scale when it is a unit value of 1 or 5, multiply by 2
+#                else multiply by 2.5.
+#                If scale is at 10V, then that is the max.
+#                """
+#                if chscale in [0.001, 0.01, 0.1, 1.0, 0.005, 0.05, 0.5, 5.0]:
+#                    newchscale = chscale*2
+#                if chscale in [0.002, 0.02, 0.2, 2.0]:
+#                    newchscale = chscale*2.5
+#                if chscale == 10:
+#                    okayscale = 1
+#                    print('CH'+str(i+1)+': already at max scale')
+#                    break                    
+#                scope.write("CH"+str(i+1)+":SCALE "+str(newchscale))
+#                print('CH'+str(i+1)+': changing scale from '+str(chscale)+' to '+str(newchscale))
+#            if lowcount/short_record_length > 0.9999 and highcount/short_record_length < 0.0001:
+#                chscale = float(scope.query("CH"+str(i+1)+":SCALE?"))
+#                if chscale in [0.01, 0.1, 1.0, 10.0, 0.002, 0.02, 0.2, 2.0]:
+#                    newchscale = chscale/2
+#                if chscale in [ 0.005, 0.05, 0.5, 5.0]:
+#                    newchscale = chscale/2.5
+#                if chscale == 0.001:
+#                    okayscale = 1
+#                    print('CH'+str(i+1)+': already at min scale')
+#                    break                     
+#                scope.write("CH"+str(i+1)+":SCALE "+str(newchscale))
+#                print('CH'+str(i+1)+': changing scale from '+str(chscale)+' to '+str(newchscale))
+#            if highcount/short_record_length < 0.0001 and lowcount/short_record_length < 0.9999:
+#                okayscale = 1
+#        scope.write(":Horizontal:recordlength "+str(long_record_length))
+#        hscale = 0.000000001*long_record_length*0.1
+#        scope.write(":Horizontal:Scale "+str(hscale))
 
 """
 :brief reads data from oscilloscope and returns recorded voltage
@@ -175,8 +233,7 @@ def checkscale(scope, numchan, short_record_length, long_record_length):
 :param int data type short_record_length: unexplained
 :param int data type long_record_length: unexplained
 """
-def read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length):
-    checkscale(scope, numchan, short_record_length, long_record_length)    
+def read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length):    
     wait_time = calc_wait_time(scope)
     record_length=int(scope.query(':HORIZONTAL:RECORDLENGTH?'))
     scope.write('DATA:START 1')
@@ -214,23 +271,24 @@ def read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, lo
 :param
 :return
 """
-def mainforAmbrell(numchan, nstart, j, short_record_length, long_record_length):
+def mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_length):
     
-    #Initialize system for data-taking
-    rm = pyvisa.highlevel.ResourceManager()
-    #Visa address for Tektronik Osciloscope
-    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
-
-    scope = rm.open_resource(visa_address)
-    #Open channels
-    scope.write(":SELECT:CH1 on")
-    scope.write(":SELECT:CH2 on")
-    scope.write(":SELECT:CH3 on")
-    #Encodes oscilloscope data into ASCII format
-    scope.write(":DATA:ENCDG ASCII")
-    
-    scope.write('Data:width 2')
-    
+#    #Initialize system for data-taking
+#    rm = pyvisa.highlevel.ResourceManager()
+#    #Visa address for Tektronik Osciloscope
+#    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
+#
+#    scope = rm.open_resource(visa_address)
+#    #Open channels
+#    scope.write(":SELECT:CH1 on")
+#    scope.write(":SELECT:CH2 on")
+#    scope.write(":SELECT:CH3 on")
+#    #Encodes oscilloscope data into ASCII format
+#    scope.write(":DATA:ENCDG ASCII")
+#    
+#    scope.write('Data:width 2')
+#    
+#    checkscale(scope, numchan, short_record_length, long_record_length)
     return read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length)
 
 def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan):
@@ -250,9 +308,25 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan):
     nstart = 0
     output = []
     
+    rm = pyvisa.highlevel.ResourceManager()
+    #Visa address for Tektronik Osciloscope
+    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
+
+    scope = rm.open_resource(visa_address)
+    #Open channels
+    scope.write(":SELECT:CH1 on")
+    scope.write(":SELECT:CH2 on")
+    scope.write(":SELECT:CH3 on")
+    #Encodes oscilloscope data into ASCII format
+    scope.write(":DATA:ENCDG ASCII")
+    
+    scope.write('Data:width 2')
+    
+    checkscale(scope, numchan, short_record_length, long_record_length)
+    
     #startTime = time.time()
     for j in range(numcollects):
-        output += [mainforAmbrell(numchan, nstart, j, short_record_length, long_record_length)]
+        output += [mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_length)]
         time.sleep(pause)    
     
     finalOutput = [['?']*len(output) for i in range(numchan)]
