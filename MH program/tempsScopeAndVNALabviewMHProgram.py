@@ -154,7 +154,7 @@ def calc_wait_time(scope):
 :param int data type short_record_length: unexplained
 :param int data type long_record_length: unexplained
 """
-def checkscale(scope, numchan, short_record_length, long_record_length, horizontalScale):
+def checkscale(scope, numchan, short_record_length, long_record_length):
     scope.write(':Horizontal:Recordlength '+str(short_record_length))
     scope.write('DATA:START 1')
     scope.write('DATA:STOP '+str(short_record_length))
@@ -290,7 +290,7 @@ def mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_le
 #    checkscale(scope, numchan, short_record_length, long_record_length)
     return read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length)
 
-def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, horizontalScale, runCheckScale):
+def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
     
     short_record_length = shortRecordLength
     long_record_length = longRecordLength
@@ -321,11 +321,11 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, horizon
     
     scope.write('Data:width 2')
     
-    hScale = horizontalScale
+    hScale = 1/freq
     scope.write(":Horizontal:Scale "+str(hScale))
     
     if(runCheckScale.lower()=="y"):
-        checkscale(scope, numchan, short_record_length, long_record_length, horizontalScale)
+        checkscale(scope, numchan, short_record_length, long_record_length)
     
     #startTime = time.time()
     for j in range(numcollects):
