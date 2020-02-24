@@ -12,6 +12,27 @@ import csv
 from pathlib import Path
 import os
 import xlsxwriter
+import copy
+
+def setStartTime(value):
+    global startTime
+    startTime = value
+
+def getStartTime():
+    global startTime
+    return startTime
+
+def getStartRun(cycle):
+    global startRunTime
+    return startRunTime[cycle]
+
+def initStartRun(maxCycle):
+    global startRunTime
+    startRunTime = [i for i in range(maxCycle)] 
+
+def setStartRun(index, diff):
+    global startRunTime
+    startRunTime[index] = diff
 
 def getRawData(scope):
     return scope.query_ascii_values("CURVE?")
@@ -120,13 +141,21 @@ def get_data(scope):
 :param int data type record_length: number of sample data recorded
 :return list data type times: the times at which sampling data was recorded
 """ 
-def get_time(scope, record_length):
+def get_time(scope, record_length, diff):
     times=['?']*record_length
     xincr = float(scope.query('WFMOutpre:XINCR?'))
     print('xincr= '+str(xincr))
     for i in range(record_length):
-        times[i]=float(i)*xincr
+        times[i]= (float(i)*xincr) + diff
     return times  
+
+def get_abs_time(scope, record_length):
+    times=['?']*record_length
+    xincr = float(scope.query('WFMOutpre:XINCR?'))
+    print('xincr= '+str(xincr))
+    for i in range(record_length):
+        times[i]= (float(i)*xincr)
+    return times
 
 """
 :brief obtains the recording time interval
@@ -154,7 +183,7 @@ def calc_wait_time(scope):
 :param int data type short_record_length: unexplained
 :param int data type long_record_length: unexplained
 """
-def checkscale(scope, numchan, short_record_length, long_record_length):
+def checkscale(scope, numchan, short_record_length):
     scope.write(':Horizontal:Recordlength '+str(short_record_length))
     scope.write('DATA:START 1')
     scope.write('DATA:STOP '+str(short_record_length))
@@ -166,7 +195,6 @@ def checkscale(scope, numchan, short_record_length, long_record_length):
             channel = i+1
             set_channel(scope,channel)
             okayscale = setScale(scope, withinRange(short_record_length,getRawData(scope)), channel)
-            
 #    scope.write(":Horizontal:Scale "+str(hscale))
 #    #Sets the "from" part of the waveform to be captured. In this case from data point 1
 #    scope.write('DATA:START 1')
@@ -232,19 +260,20 @@ def checkscale(scope, numchan, short_record_length, long_record_length):
 :param int data type short_record_length: unexplained
 :param int data type long_record_length: unexplained
 """
-def read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length):    
+def read_and_write_data_from_Nch(scope, numchan, index):    
     wait_time = calc_wait_time(scope)
     record_length=int(scope.query(':HORIZONTAL:RECORDLENGTH?'))
     scope.write('DATA:START 1')
     scope.write('DATA:STOP '+str(record_length))
     scope.write('acquire:stopafter sequence')
     voltage = [['?']*(record_length)]*numchan
+    diff = time.time() - getStartTime()
     for i in range(numchan):
         set_channel(scope, i+1)
         voltage[i]=get_data(scope)                
         time.sleep(wait_time)
     set_channel(scope, 1)
-    times=get_time(scope, record_length)
+    times = get_time(scope, record_length, diff)
     scope.write('FPAnel:PRESS runstop')
     
     output = [times]
@@ -291,7 +320,7 @@ def mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_le
     return read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length)
 
 def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
-    
+    initStartRun(numCollects)
     short_record_length = shortRecordLength
     long_record_length = longRecordLength
     #descriptor = 'CH1-Hcoil-CH2-Mcoil-empty-test'
@@ -299,12 +328,11 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, r
     numchan= numChan
     
     """
-    note time between data collections is about 16 seconds already because of various oscilloscope data transfer wait times
+    note time between data collections is about 2~3 seconds already because of various oscilloscope data transfer wait times
     (which are probably overly conservative)
-    so any nonzero pause value makes that wait time longer than 16 seconds
+    so any nonzero pause value makes that wait time longer than that
     """
     pause = 0
-    nstart = 0
     output = []
     
     rm = pyvisa.highlevel.ResourceManager()
@@ -318,18 +346,17 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, r
     scope.write(":SELECT:CH3 on")
     #Encodes oscilloscope data into ASCII format
     scope.write(":DATA:ENCDG ASCII")
-    
     scope.write('Data:width 2')
     
     hScale = 1/freq
     scope.write(":Horizontal:Scale "+str(hScale))
     
     if(runCheckScale.lower()=="y"):
-        checkscale(scope, numchan, short_record_length, long_record_length)
-    
-    #startTime = time.time()
+        checkscale(scope, numchan, short_record_length)
+    scope.write(':Horizontal:Recordlength '+str(long_record_length))
+    setStartTime(time.time())
     for j in range(numcollects):
-        output += [read_and_write_data_from_Nch(scope,numchan, nstart, short_record_length, long_record_length)]
+        output += [read_and_write_data_from_Nch(scope,numchan,j)]
         time.sleep(pause)    
     
     finalOutput = [['?']*len(output) for i in range(numchan)]
@@ -338,6 +365,16 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, r
             finalOutput[k][i] = (output[i][0], output[i][1+k])
     scope.close()
     return finalOutput
+
+def convertToRelative(array):
+    for i in range(len(array)):
+        for j in range(len(array[i])):
+            diff = array[i][j][0][1] - array[i][j][0][0]
+            times = []
+            for k in range(len(array[i][j][0])):
+                times.append(diff*k)
+            array[i][j] = (times, array[i][j][1])
+    return array
 
 def opsensRead(numCollects):
     """
@@ -426,10 +463,9 @@ def vnaRead(numTimes, start, end):
     output = [freq]+[real]+[imag]
     return output
 
-def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime, run): 
+def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime, run):
     delay = 0.02;
     dataPointsForEachScopeRun = int(1.80/delay)
-    ntimes = numCollects*int(dataPointsForEachScopeRun)
     scopeValues = [['?']*3 for i in range(numCollects)]
     tempValues = [[] for i in range(2)]
     
@@ -454,17 +490,21 @@ def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime
             scopeValues[i][1+k] = scopeData[k][i][1]
     for i in range(len(scopeValues)):
         with open(timeVVoltage[i], 'w', newline = '') as csvfile:
-            headers = ['Time','Voltage(CH1)','Voltage(CH2)']
+            headers = ['Time Series','Voltage(CH1)','Voltage(CH2)','Time relative to Opsens']
             writer = csv.DictWriter(csvfile, fieldnames = headers)
             writer.writeheader()
-            voltageWorksheet[i].write(0,0,'Time')
+            voltageWorksheet[i].write(0,0,'Time Series')
             voltageWorksheet[i].write(0,1,'Voltage(CH1)')
             voltageWorksheet[i].write(0,2,'Voltage(CH2)')
+            voltageWorksheet[i].write(0,3,'Time relative to Opsens')
+            diff = scopeValues[0][0][1] - scopeValues[0][0][0] 
             for j in range(len(scopeValues[0][0])):
-                writer.writerow({'Time' : str(scopeValues[i][0][j]),'Voltage(CH1)' : str(scopeValues[i][1][j]), 'Voltage(CH2)': str(scopeValues[i][2][j])})        
+                writer.writerow({'Time Series' : str(diff *j),'Voltage(CH1)' : str(scopeValues[i][1][j]),
+                                 'Voltage(CH2)': str(scopeValues[i][2][j]),'Time relative to Opsens': str(scopeValues[i][0][j])})        
                 voltageWorksheet[i].write(j+1,0,scopeValues[i][0][j])
                 voltageWorksheet[i].write(j+1,1,scopeValues[i][1][j])
                 voltageWorksheet[i].write(j+1,2,scopeValues[i][2][j])
+                voltageWorksheet[i].write(j+1,3,scopeValues[i][0][j])
     
     tempWorksheet = workbook.add_worksheet('tempData')
     for k in range(len(tempData)):
@@ -500,6 +540,13 @@ def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime
             tempScopeWorksheet.write(i+1,0,i+1)
             tempScopeWorksheet.write(i+1,1,avgTemp[i])
     workbook.close()
+    
+    timeTempArray = []
+    for i in range(len(scopeData[0])):
+        timeTempArray.append(scopeData[0][i][0][0])
+    times = []
+    for i in range(len(tempData)):
+    
     return str(int(run)+1)
 
 def writeImpeadanceData(vnaData, filepath, datetime, coil):
@@ -516,7 +563,7 @@ def writeImpeadanceData(vnaData, filepath, datetime, coil):
     
     return "Yes"
 
-def readVoltageData(filepath, date, time, numChan):
+def readVoltageData(filepath, date, time, numChan, run):
     MAX_NUMCOLLECTS = 60
     
     filepath = addDirectory(filepath, date)
@@ -527,7 +574,7 @@ def readVoltageData(filepath, date, time, numChan):
     for i in range(MAX_NUMCOLLECTS):
         times = []
         voltage = [[] for range in range(numChan)]
-        voltageFilepath = addDirectory(filepath, 'voltageDataScopeRun'+date+time+'('+str(i+1)+').csv')
+        voltageFilepath = addDirectory(filepath, 'voltageDataScopeRun'+date+time+'Run('+str(run)+')Cycle('+str(i+1)+').csv')
         if os.path.exists(voltageFilepath):
             with open(voltageFilepath, 'r', newline = '') as csvfile:
                 csvreader = csv.reader(csvfile, delimiter = ',')
