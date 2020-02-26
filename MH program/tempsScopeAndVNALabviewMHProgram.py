@@ -12,7 +12,8 @@ import csv
 from pathlib import Path
 import os
 import xlsxwriter
-import copy
+import queue
+from threading import Thread
 
 def setStartTime(value):
     global startTime
@@ -282,6 +283,27 @@ def read_and_write_data_from_Nch(scope, numchan, index):
     
     return output
 
+
+def readDataFromChannel(scope, numchan, waitTime):
+    record_length = int(scope.query(':HORIZONTAL:RECORDLENGTH?'))
+    scope.write('DATA:START 1')
+    scope.write('DATA:STOP ' + str(record_length))
+    scope.write('acquire:stopafter sequence')
+    voltage = [i for i in numchan]
+    startRunTime = time.time()
+    for i in range(numchan):
+        set_channel(scope, i + 1)
+        voltage[i] = get_data(scope)
+        time.sleep(waitTime)
+    set_channel(scope, 1)
+    scope.write('FPAnel:PRESS runstop')
+
+    output = []
+    for i in range(numchan):
+        output += [voltage[i]]
+
+    return output, startRunTime
+
 """
 :brief plots the data received from oscilloscope
 :param resourceManager object scope: the access point of the oscilloscope 
@@ -299,25 +321,88 @@ def read_and_write_data_from_Nch(scope, numchan, index):
 :param
 :return
 """
-def mainforAmbrell(scope,numchan, nstart, j, short_record_length, long_record_length):
-    
-#    #Initialize system for data-taking
-#    rm = pyvisa.highlevel.ResourceManager()
-#    #Visa address for Tektronik Osciloscope
-#    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
-#
-#    scope = rm.open_resource(visa_address)
-#    #Open channels
-#    scope.write(":SELECT:CH1 on")
-#    scope.write(":SELECT:CH2 on")
-#    scope.write(":SELECT:CH3 on")
-#    #Encodes oscilloscope data into ASCII format
-#    scope.write(":DATA:ENCDG ASCII")
-#    
-#    scope.write('Data:width 2')
-#    
-#    checkscale(scope, numchan, short_record_length, long_record_length)
-    return read_and_write_data_from_Nch(scope, numchan, nstart, short_record_length, long_record_length)
+def mainforAmbrell(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
+    """Setting up oscilloscope"""
+    rm = pyvisa.highlevel.ResourceManager()
+    # Visa address for Tektronik Osciloscope
+    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
+
+    scope = rm.open_resource(visa_address)
+    # Open channels
+    scope.write(":SELECT:CH1 on")
+    scope.write(":SELECT:CH2 on")
+    #scope.write(":SELECT:CH3 on")
+
+    # Encodes oscilloscope data into ASCII format
+    scope.write(":DATA:ENCDG ASCII")
+    scope.write('Data:width 2')
+
+    #Automatically set scale
+    hScale = 1 / freq
+    scope.write(":Horizontal:Scale " + str(hScale))
+    if runCheckScale.lower() == "y":
+        checkscale(scope, numChan, shortRecordLength)
+    scope.write(':Horizontal:Recordlength ' + str(longRecordLength))
+
+    """Setting up thermometer"""
+    delay = 0.02
+    secondsForEachCollection = 2.00 #Value can be varied if necessary to capture more data points
+    dataPointsForEachScopeRun = secondsForEachCollection / delay
+    ntimes = numCollects * int(dataPointsForEachScopeRun)
+    ser = serial.Serial("COM3", 9600, timeout=((ntimes * delay) + 2))
+
+    """Setting up multi-threading"""
+    que = queue.Queue()
+    threads_list = list()
+    thread1 = Thread(target = lambda q, arg1, arg2, arg3: q.put(readScope(arg1, arg2, arg3)), args=(que, scope, numCollects, numChan))
+    threads_list.append(thread1)
+    thread2 = Thread(target = lambda q, arg1, arg2: q.put(readOpsens(arg1, arg2)), args = (que, ser, ntimes))
+    threads_list.append(thread2)
+
+
+    for thread in threads_list:
+        thread.start()
+
+    for thread in threads_list:
+        thread.join()
+
+    """Data manipulation"""
+    timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')), 0)
+    voltageData = que.get()
+    tempData = que.get()
+
+def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
+              numCollects: int,
+              numChan: int):
+    output = []
+    startTimes = []
+    pause = 0 #Pause can be increased if errors occur in data acquisition
+    waitTime = calc_wait_time(scope)
+    for j in range(numCollects):
+        outputTuple = readDataFromChannel(scope, numChan, waitTime)
+        output += [outputTuple[0]]
+        startTimes.append(outputTuple[1])
+        time.sleep(pause)
+    return output
+
+def readOpsens(ser: serial.Serial, nTimes: float):
+    unicodestring = "measure:start " + str(nTimes) + "\n"
+    ser.write(unicodestring.encode("ascii"))
+    rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
+
+    #Remove unnecessary info in output
+    removeMisc = ['\4', 'CH1', '']
+    for i in range(len(rawData)):
+        if rawData[i] in removeMisc:
+            rawData.pop(i)
+            #Subtract 1 to return to object that replaced item at 'i'
+            i-=1
+    """
+    for y in range(len(removeMisc)):
+        while removeMisc[y] in rawData:
+            rawData.remove(removeMisc[y])
+    """
+    return rawData
 
 def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
     initStartRun(numCollects)
@@ -385,7 +470,7 @@ def opsensRead(numCollects):
     writing things ex cetera.
     Hence the value of 1.
     """
-    delay = 0.02;
+    delay = 0.02
     dataPointsForEachScopeRun = 1.80/delay
     ntimes = numCollects*int(dataPointsForEachScopeRun)
     ser = serial.Serial("COM3",9600, timeout=((ntimes*delay)+2))
