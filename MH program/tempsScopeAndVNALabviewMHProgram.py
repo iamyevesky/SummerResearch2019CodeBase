@@ -289,7 +289,7 @@ def readDataFromChannel(scope, numchan, waitTime):
     scope.write('DATA:START 1')
     scope.write('DATA:STOP ' + str(record_length))
     scope.write('acquire:stopafter sequence')
-    voltage = [i for i in numchan]
+    voltage = [i for i in range(numchan)]
     startRunTime = time.time()
     for i in range(numchan):
         set_channel(scope, i + 1)
@@ -393,16 +393,9 @@ def readOpsens(ser, nTimes):
 
     #Remove unnecessary info in output
     removeMisc = ['\4', 'CH1', '']
-    for i in range(len(rawData)):
-        if rawData[i] in removeMisc:
-            rawData.pop(i)
-            #Subtract 1 to return to object that replaced item at 'i'
-            i-=1
-    """
     for y in range(len(removeMisc)):
         while removeMisc[y] in rawData:
             rawData.remove(removeMisc[y])
-    """
     return rawData
 
 def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
