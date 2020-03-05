@@ -321,7 +321,7 @@ def readDataFromChannel(scope, numchan, waitTime):
 :param
 :return
 """
-def mainforAmbrell(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
+def mainForAmbrell(shortRecordLength, longRecordLength, numCollects, numChan, freq, runCheckScale):
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -370,6 +370,7 @@ def mainforAmbrell(shortRecordLength, longRecordLength, numCollects, numChan, fr
     timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')), 0)
     voltageData = que.get()
     tempData = que.get()
+    return voltageData, tempData
 
 def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
               numCollects: int,
@@ -385,7 +386,7 @@ def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
         time.sleep(pause)
     return output
 
-def readOpsens(ser: serial.Serial, nTimes: float):
+def readOpsens(ser, nTimes):
     unicodestring = "measure:start " + str(nTimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
@@ -626,12 +627,12 @@ def writeDataFiles(scopeData, tempData, numCollects, numChan, filepath, datetime
             tempScopeWorksheet.write(i+1,1,avgTemp[i])
     workbook.close()
     
-    timeTempArray = []
-    for i in range(len(scopeData[0])):
-        timeTempArray.append(scopeData[0][i][0][0])
-    times = []
-    for i in range(len(tempData)):
-    
+#    timeTempArray = []
+#    for i in range(len(scopeData[0])):
+#        timeTempArray.append(scopeData[0][i][0][0])
+#    times = []
+#    for i in range(len(tempData)):
+#        i
     return str(int(run)+1)
 
 def writeImpeadanceData(vnaData, filepath, datetime, coil):
@@ -687,7 +688,7 @@ def readTempData(filepath, date, time):
     Hence the value of 1.
     """
     
-    delay = 0.02;
+    delay = 0.02
     dataPointsForEachScopeRun = int(1.80/delay)
     filepath = addDirectory(filepath, date)
     filepath = addDirectory(filepath, time)
@@ -718,3 +719,5 @@ def addDirectory(iPath, newPath):
     if not os.path.exists(iPath):
         os.mkdir(iPath)
     return iPath+'\\'+newPath
+
+result = mainForAmbrell(10000, 100000, 3, 2, 227000000, "n")
