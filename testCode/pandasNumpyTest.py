@@ -9,3 +9,4 @@ li = [str(i) for i in np.arange(0, 2, 0.02)]
 df2 = pd.DataFrame(index=pd.Series(np.arange(0, 2, 0.02)))
 df2['Temp'] = range(0, 100)
 print(df2.iloc[int(0.022/0.02)]['Temp'])
+df2.to_csv("output.csv", index=True, header=True)

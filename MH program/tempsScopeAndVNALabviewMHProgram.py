@@ -19,7 +19,8 @@ from threading import Thread
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
-                   numChan: int, freq: int, runCheckScale):
+                   numChan: int, freq: int, runCheckScale: str,
+                   filepath: str, datetime: str, run: int):
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -80,7 +81,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfVoltageData['Time'] = timesForScopeData
     for i in range(numCollects):
         for j in range(numChan):
-            dfVoltageData['Run' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
+            dfVoltageData['Cycle' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
 
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
@@ -100,6 +101,17 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfRunTemp['Temperature'] = runTemp
 
     """Generating .csv files from pd.DataFrame() objects"""
+    opsensFilePath = addDirectory(filepath, 'Opsens')
+    scopeFilePath = addDirectory(filepath, 'Oscilloscope')
+    scopeVoltage = addDirectory(scopeFilePath, 'Run('+str(run)+')')
+    timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + '.csv')
+    cycleVTemp = addDirectory(opsensFilePath, 'tempScopeRunData' + datetime + '.csv')
+    timeVTemp = Path(timeVTemp)
+    cycleVTemp = Path(cycleVTemp)
+    scopeVoltage = Path(scopeVoltage)
+    dfVoltageData.to_csv(scopeVoltage, index=False)
+    dfRunTemp.to_csv(cycleVTemp, index=False)
+    dfTempData.to_csv(timeVTemp, index=False)
 
     """Generating tuples as output for LabView Graphic component"""
     return voltageData, tempData
