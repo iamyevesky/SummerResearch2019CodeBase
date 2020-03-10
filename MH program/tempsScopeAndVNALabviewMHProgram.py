@@ -29,7 +29,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     # Open channels
     scope.write(":SELECT:CH1 on")
     scope.write(":SELECT:CH2 on")
-    # scope.write(":SELECT:CH3 on")
+    scope.write(":SELECT:CH3 on")
 
     # Encodes oscilloscope data into ASCII format
     scope.write(":DATA:ENCDG ASCII")
@@ -49,14 +49,18 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     ntimes = numCollects * int(dataPointsForEachScopeRun)
     ser = serial.Serial("COM3", 9600, timeout=((ntimes * delay) + 2))
 
+    """Values that extract start times for threads"""
+    startTimeVoltage = []
+    startTimeOpsens = 0
+
     """Setting up multi-threading"""
     que = queue.Queue()
     threads_list = list()
-    thread1 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readScope(arg1, arg2, arg3)),
-                     args=(que, scope, numCollects, numChan))
+    thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
+                     args=(que, scope, numCollects, numChan, startTimeVoltage))
     threads_list.append(thread1)
-    thread2 = Thread(target=lambda q, arg1, arg2: q.put(readOpsens(arg1, arg2)),
-                     args=(que, ser, ntimes))
+    thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
+                     args=(que, ser, ntimes, startTimeOpsens))
     threads_list.append(thread2)
 
     for thread in threads_list:
@@ -66,9 +70,38 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         thread.join()
 
     """Data manipulation"""
-    timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')), 0)
+    timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
     voltageData = que.get()
     tempData = que.get()
+    dfVoltageData = pd.DataFrame()
+
+    period = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
+    dfTempData = pd.DataFrame(index=pd.Series(np.arange(0, len(tempData), period)))
+    dfVoltageData['Time'] = timesForScopeData
+    for i in range(numCollects):
+        for j in range(numChan):
+            dfVoltageData['Run' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
+
+    dfTempData['Temperature'] = tempData
+    runStartTimeRelative = []
+    for i in range(len(startTimeVoltage)):
+        value = startTimeVoltage[i] - startTimeOpsens
+        if value < 0:
+            runStartTimeRelative.append(0)
+        else:
+            runStartTimeRelative.append(value)
+
+    runTemp = []
+    for i in range(len(runStartTimeRelative)):
+        runTemp.append(dfTempData.iloc[int(runStartTimeRelative / period)]['Temperature'])
+
+    dfRunTemp = pd.DataFrame()
+    dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
+    dfRunTemp['Temperature'] = runTemp
+
+    """Generating .csv files from pd.DataFrame() objects"""
+
+    """Generating tuples as output for LabView Graphic component"""
     return voltageData, tempData
 
 
@@ -118,20 +151,20 @@ def vnaRead(numTimes, start, end):
 """
 
 
-def get_time(scope, record_length, diff):
+def get_time(scope, record_length):
     times = ['?'] * record_length
     xincr = float(scope.query('WFMOutpre:XINCR?'))
     print('xincr= ' + str(xincr))
     for i in range(record_length):
-        times[i] = (float(i) * xincr) + diff
+        times[i] = (float(i) * xincr)
     return times
 
 
 def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
               numCollects: int,
-              numChan: int):
+              numChan: int,
+              startTimes: list):
     output = []
-    startTimes = []
     pause = 0  # Pause can be increased if errors occur in data acquisition
     waitTime = calc_wait_time(scope)
     for j in range(numCollects):
@@ -168,9 +201,10 @@ def get_dt(scope):
     return xincr
 
 
-def readOpsens(ser: serial.Serial, nTimes: int):
+def readOpsens(ser: serial.Serial, nTimes: int, startTime: int):
     unicodestring = "measure:start " + str(nTimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
+    startTime = time.time()
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
 
     # Remove unnecessary info in output
@@ -351,7 +385,7 @@ def read_and_write_data_from_Nch(scope, numchan, index):
         voltage[i] = get_data(scope)
         time.sleep(wait_time)
     set_channel(scope, 1)
-    times = get_time(scope, record_length, 0)
+    times = get_time(scope, record_length)
     scope.write('FPAnel:PRESS runstop')
 
     output = [times]
@@ -411,7 +445,7 @@ def scopeRead(shortRecordLength, longRecordLength, numCollects, numChan, freq, r
     hScale = 1 / freq
     scope.write(":Horizontal:Scale " + str(hScale))
 
-    if (runCheckScale.lower() == "y"):
+    if runCheckScale.lower() == "y":
         checkscale(scope, numchan, short_record_length)
     scope.write(':Horizontal:Recordlength ' + str(long_record_length))
     for j in range(numcollects):
@@ -690,7 +724,6 @@ def addDirectory(iPath, newPath):
 result = mainForAmbrell(10000, 100000, 3, 2, 227000000, "n")
 
 """Legacy code for checkscale function. Do not delete. """
-
 
 #    scope.write(":Horizontal:Scale "+str(hscale))
 #    #Sets the "from" part of the waveform to be captured. In this case from data point 1
