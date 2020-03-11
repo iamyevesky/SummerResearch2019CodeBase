@@ -111,10 +111,17 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     scopeVoltage = Path(scopeVoltage)
     dfVoltageData.to_csv(scopeVoltage, index=False)
     dfRunTemp.to_csv(cycleVTemp, index=False)
-    dfTempData.to_csv(timeVTemp, index=False)
+    dfTempData.to_csv(timeVTemp, index=True)
 
-    """Generating tuples as output for LabView Graphic component"""
-    return voltageData, tempData
+    """Generating list containing tuples as output for LabView Graphic component"""
+    output = [[] for i in range(numChan)]
+    for i in range(numCollects):
+        for j in range(numChan):
+            output[j].append((timesForScopeData, voltageData[i][j]))
+    output.append([(np.arange(0, len(tempData), period).tolist(), tempData)])
+
+    """Return list to LabView Graphic Component"""
+    return output
 
 
 def vnaRead(numTimes, start, end):
