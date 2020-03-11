@@ -45,14 +45,14 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     """Setting up thermometer"""
     delay = 0.02
-    secondsForEachCollection = 2.00  # Value can be varied if necessary to capture more data points
+    secondsForEachCollection = 15.00  # Value can be varied if necessary to capture more data points
     dataPointsForEachScopeRun = secondsForEachCollection / delay
     ntimes = numCollects * int(dataPointsForEachScopeRun)
     ser = serial.Serial("COM3", 9600, timeout=((ntimes * delay) + 2))
 
     """Values that extract start times for threads"""
     startTimeVoltage = []
-    startTimeOpsens = 0
+    startTimeOpsens = []
 
     """Setting up multi-threading"""
     que = queue.Queue()
@@ -72,29 +72,31 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     """Data manipulation"""
     timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
+    scope.close()
     voltageData = que.get()
     tempData = que.get()
     dfVoltageData = pd.DataFrame()
 
     period = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
-    dfTempData = pd.DataFrame(index=pd.Series(np.arange(0, len(tempData), period)))
+    dfTempData = pd.DataFrame()
     dfVoltageData['Time'] = timesForScopeData
     for i in range(numCollects):
         for j in range(numChan):
             dfVoltageData['Cycle' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
-
+    dfTempData['Time'] = np.arange(0, len(tempData)*0.02, period).tolist()
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
     for i in range(len(startTimeVoltage)):
-        value = startTimeVoltage[i] - startTimeOpsens
+        value = startTimeVoltage[i] - startTimeOpsens[0]
         if value < 0:
             runStartTimeRelative.append(0)
         else:
             runStartTimeRelative.append(value)
+        print(value)
 
     runTemp = []
     for i in range(len(runStartTimeRelative)):
-        runTemp.append(dfTempData.iloc[int(runStartTimeRelative / period)]['Temperature'])
+        runTemp.append(dfTempData.iloc[int(runStartTimeRelative[i] / period)]['Temperature'])
 
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
@@ -103,7 +105,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Generating .csv files from pd.DataFrame() objects"""
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
-    scopeVoltage = addDirectory(scopeFilePath, 'Run('+str(run)+')')
+    scopeVoltage = addDirectory(scopeFilePath, 'Run('+str(run)+').csv')
     timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + '.csv')
     cycleVTemp = addDirectory(opsensFilePath, 'tempScopeRunData' + datetime + '.csv')
     timeVTemp = Path(timeVTemp)
@@ -118,9 +120,10 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     for i in range(numCollects):
         for j in range(numChan):
             output[j].append((timesForScopeData, voltageData[i][j]))
-    output.append([(np.arange(0, len(tempData), period).tolist(), tempData)])
+    output.append([(np.arange(0, len(tempData)*0.02, period).tolist(), tempData)])
 
     """Return list to LabView Graphic Component"""
+    run = run + 1
     return output
 
 
@@ -220,10 +223,10 @@ def get_dt(scope):
     return xincr
 
 
-def readOpsens(ser: serial.Serial, nTimes: int, startTime: int):
+def readOpsens(ser: serial.Serial, nTimes: int, startTime):
     unicodestring = "measure:start " + str(nTimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
-    startTime = time.time()
+    startTime.append(time.time())
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
 
     # Remove unnecessary info in output
@@ -231,6 +234,7 @@ def readOpsens(ser: serial.Serial, nTimes: int, startTime: int):
     for y in range(len(removeMisc)):
         while removeMisc[y] in rawData:
             rawData.remove(removeMisc[y])
+    ser.close()
     return rawData
 
 
@@ -738,9 +742,6 @@ def addDirectory(iPath, newPath):
     if not os.path.exists(iPath):
         os.mkdir(iPath)
     return iPath + '\\' + newPath
-
-
-result = mainForAmbrell(10000, 100000, 3, 2, 227000000, "n")
 
 """Legacy code for checkscale function. Do not delete. """
 
