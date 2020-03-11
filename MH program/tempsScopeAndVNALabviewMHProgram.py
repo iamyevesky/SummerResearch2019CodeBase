@@ -45,7 +45,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     """Setting up thermometer"""
     delay = 0.02
-    secondsForEachCollection = 15.00  # Value can be varied if necessary to capture more data points
+    secondsForEachCollection = 2.00  # Value can be varied if necessary to capture more data points
     dataPointsForEachScopeRun = secondsForEachCollection / delay
     ntimes = numCollects * int(dataPointsForEachScopeRun)
     ser = serial.Serial("COM3", 9600, timeout=((ntimes * delay) + 2))
@@ -83,7 +83,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     for i in range(numCollects):
         for j in range(numChan):
             dfVoltageData['Cycle' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
-    dfTempData['Time'] = np.arange(0, len(tempData)*0.02, period).tolist()
+    dfTempData['Time'] = [period*i for i in range(len(tempData))]
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
     for i in range(len(startTimeVoltage)):
@@ -120,7 +120,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     for i in range(numCollects):
         for j in range(numChan):
             output[j].append((timesForScopeData, voltageData[i][j]))
-    output.append([(np.arange(0, len(tempData)*0.02, period).tolist(), tempData)])
+    output.append([([period*i for i in range(len(tempData))], tempData)])
 
     """Return list to LabView Graphic Component"""
     run = run + 1
