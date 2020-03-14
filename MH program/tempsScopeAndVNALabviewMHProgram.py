@@ -20,7 +20,8 @@ from threading import Thread
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: str,
-                   filepath: str, datetime: str, run: int):
+                   filepath: str, datetime: str, run: str):
+    run = int(run)
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -44,11 +45,11 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     scope.write(':Horizontal:Recordlength ' + str(longRecordLength))
 
     """Setting up thermometer"""
-    delay = 0.02
-    secondsForEachCollection = 2.00  # Value can be varied if necessary to capture more data points
-    dataPointsForEachScopeRun = secondsForEachCollection / delay
+    PERIOD = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
+    SECONDS_FOR_EACH_COLLECTION = 2.00  # Value can be varied if necessary to capture more data points
+    dataPointsForEachScopeRun = SECONDS_FOR_EACH_COLLECTION / PERIOD
     ntimes = numCollects * int(dataPointsForEachScopeRun)
-    ser = serial.Serial("COM3", 9600, timeout=((ntimes * delay) + 2))
+    ser = serial.Serial("COM3", 9600, timeout=((ntimes * PERIOD) + 2))
 
     """Values that extract start times for threads"""
     startTimeVoltage = []
@@ -77,13 +78,12 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     tempData = que.get()
     dfVoltageData = pd.DataFrame()
 
-    period = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
     dfTempData = pd.DataFrame()
     dfVoltageData['Time'] = timesForScopeData
     for i in range(numCollects):
         for j in range(numChan):
             dfVoltageData['Cycle' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
-    dfTempData['Time'] = [period*i for i in range(len(tempData))]
+    dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
     for i in range(len(startTimeVoltage)):
@@ -96,7 +96,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     runTemp = []
     for i in range(len(runStartTimeRelative)):
-        runTemp.append(dfTempData.iloc[int(runStartTimeRelative[i] / period)]['Temperature'])
+        runTemp.append(dfTempData.iloc[int(runStartTimeRelative[i] / PERIOD)]['Temperature'])
 
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
@@ -105,7 +105,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Generating .csv files from pd.DataFrame() objects"""
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
-    scopeVoltage = addDirectory(scopeFilePath, 'Run('+str(run)+').csv')
+    scopeVoltage = addDirectory(scopeFilePath, 'VoltageDataRun('+str(run)+').csv')
     timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + '.csv')
     cycleVTemp = addDirectory(opsensFilePath, 'tempScopeRunData' + datetime + '.csv')
     timeVTemp = Path(timeVTemp)
@@ -113,17 +113,21 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     scopeVoltage = Path(scopeVoltage)
     dfVoltageData.to_csv(scopeVoltage, index=False)
     dfRunTemp.to_csv(cycleVTemp, index=False)
-    dfTempData.to_csv(timeVTemp, index=True)
+    dfTempData.to_csv(timeVTemp, index=False)
 
     """Generating list containing tuples as output for LabView Graphic component"""
     output = [[] for i in range(numChan)]
     for i in range(numCollects):
         for j in range(numChan):
             output[j].append((timesForScopeData, voltageData[i][j]))
-    output.append([([period*i for i in range(len(tempData))], tempData)])
-
+    timeSeriesOpsens = [PERIOD*i for i in range(len(tempData))]
+    while len(timeSeriesOpsens) < len(timesForScopeData):
+        timeSeriesOpsens.append(0)
+        tempData.append(0)
+    output.append([(timeSeriesOpsens, tempData),
+                   ([0 for i in range(len(timesForScopeData))], [0 for i in range(len(timesForScopeData))]),
+                   ([0 for i in range(len(timesForScopeData))], [0 for i in range(len(timesForScopeData))])])
     """Return list to LabView Graphic Component"""
-    run = run + 1
     return output
 
 
