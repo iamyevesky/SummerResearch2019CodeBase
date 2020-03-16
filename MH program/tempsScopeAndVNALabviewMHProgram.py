@@ -20,8 +20,8 @@ from threading import Thread
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: str,
-                   filepath: str, datetime: str, run: str):
-    run = int(run)
+                   filepath: str, datetime: str, strRun: str):
+    run = int(strRun)
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -29,9 +29,15 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     scope = rm.open_resource(visa_address)
     # Open channels
-    scope.write(":SELECT:CH1 on")
-    scope.write(":SELECT:CH2 on")
-    scope.write(":SELECT:CH3 on")
+    if numChan < 2:
+        scope.write(":SELECT:CH1 on")
+    elif numChan < 3:
+        scope.write(":SELECT:CH1 on")
+        scope.write(":SELECT:CH2 on")
+    elif numChan < 4:
+        scope.write(":SELECT:CH1 on")
+        scope.write(":SELECT:CH2 on")
+        scope.write(":SELECT:CH3 on")
 
     # Encodes oscilloscope data into ASCII format
     scope.write(":DATA:ENCDG ASCII")
@@ -124,10 +130,12 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     while len(timeSeriesOpsens) < len(timesForScopeData):
         timeSeriesOpsens.append(0)
         tempData.append(0)
-    output.append([(timeSeriesOpsens, tempData),
-                   ([0 for i in range(len(timesForScopeData))], [0 for i in range(len(timesForScopeData))]),
-                   ([0 for i in range(len(timesForScopeData))], [0 for i in range(len(timesForScopeData))])])
+    tempDataLabview = []
+    for i in range(numCollects):
+        tempDataLabview.append((timeSeriesOpsens, tempData))
+    output.append(tempDataLabview)
     """Return list to LabView Graphic Component"""
+    strRun = str(run + 1)
     return output
 
 
