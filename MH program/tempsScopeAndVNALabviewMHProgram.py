@@ -128,8 +128,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
             output[j].append((timesForScopeData, voltageData[i][j]))
     timeSeriesOpsens = [PERIOD*i for i in range(len(tempData))]
     while len(timeSeriesOpsens) < len(timesForScopeData):
-        timeSeriesOpsens.append(0)
-        tempData.append(0)
+        timeSeriesOpsens.append(0.01)
+        tempData.append(0.01)
     tempDataLabview = []
     for i in range(numCollects):
         tempDataLabview.append((timeSeriesOpsens, tempData))
