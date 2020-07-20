@@ -8,7 +8,6 @@ Created on Fri Jun 14 12:45:45 2019
 import time
 import pyvisa
 import serial
-import numpy as np
 import pandas as pd
 import csv
 from pathlib import Path
@@ -22,6 +21,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
                    numChan: int, freq: int, runCheckScale: str,
                    filepath: str, datetime: str, strRun: str):
     run = int(strRun)
+    startTime = time.time()
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -92,13 +92,14 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
+    runStartTimeRelativeVoltage = []
     for i in range(len(startTimeVoltage)):
         value = startTimeVoltage[i] - startTimeOpsens[0]
         if value < 0:
             runStartTimeRelative.append(0)
         else:
             runStartTimeRelative.append(value)
-        print(value)
+        runStartTimeRelativeVoltage.append(startTimeVoltage[i] - startTime)
 
     runTemp = []
     for i in range(len(runStartTimeRelative)):
@@ -107,13 +108,14 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
     dfRunTemp['Temperature'] = runTemp
+    dfRunTemp['Relative Start Time'] = runStartTimeRelativeVoltage
 
     """Generating .csv files from pd.DataFrame() objects"""
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
     scopeVoltage = addDirectory(scopeFilePath, 'VoltageDataRun('+str(run)+').csv')
     timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + '.csv')
-    cycleVTemp = addDirectory(opsensFilePath, 'tempScopeRunData' + datetime + '.csv')
+    cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + '.csv')
     timeVTemp = Path(timeVTemp)
     cycleVTemp = Path(cycleVTemp)
     scopeVoltage = Path(scopeVoltage)
