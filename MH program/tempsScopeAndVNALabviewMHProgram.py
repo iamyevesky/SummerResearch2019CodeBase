@@ -15,11 +15,19 @@ import os
 import xlsxwriter
 import queue
 from threading import Thread
+from simulation import Simulator
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
-                   numChan: int, freq: int, runCheckScale: str,
-                   filepath: str, datetime: str, strRun: str):
+                   numChan: int, freq: int, runCheckScale: int,
+                   filepath: str, datetime: str, strRun: str, runSimulation: int):
+    if runSimulation:
+        strRun = str(int(strRun) + 1)
+        return Simulator(
+            "C:/Users/yeves/OneDrive - lafayette.edu/School Documents/Competition, Research Documents/SummerResearch2020/voltageDataScopeRun20190729160604(1).csv",
+            "C:/Users/yeves/OneDrive - lafayette.edu/School Documents/Competition, Research Documents/SummerResearch2020/tempScopeRunData20190729161749.csv").getOutput()
+    
+    
     run = int(strRun)
     startTime = time.time()
     """Setting up oscilloscope"""
@@ -46,7 +54,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     # Automatically set scale
     hScale = 1 / freq
     scope.write(":Horizontal:Scale " + str(hScale))
-    if runCheckScale.lower() == "y":
+    if runCheckScale:
         checkscale(scope, numChan, shortRecordLength)
     scope.write(':Horizontal:Recordlength ' + str(longRecordLength))
 
@@ -756,6 +764,8 @@ def addDirectory(iPath, newPath):
     if not os.path.exists(iPath):
         os.mkdir(iPath)
     return iPath + '\\' + newPath
+
+mainForAmbrell(0,0,0,0,0,0,"","","0",1)
 
 """Legacy code for checkscale function. Do not delete. """
 
