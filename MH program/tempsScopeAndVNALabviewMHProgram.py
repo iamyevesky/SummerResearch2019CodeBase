@@ -23,10 +23,10 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
                    filepath: str, datetime: str, strRun: str, runSimulation: int):
     if runSimulation:
         strRun = str(int(strRun) + 1)
+        path = os.path.dirname(__file__)
         return Simulator(
-            "C:/Users/yeves/OneDrive - lafayette.edu/School Documents/Competition, Research Documents/SummerResearch2020/voltageDataScopeRun20190729160604(1).csv",
-            "C:/Users/yeves/OneDrive - lafayette.edu/School Documents/Competition, Research Documents/SummerResearch2020/tempScopeRunData20190729161749.csv").getOutput()
-    
+            addDirectory(path, "voltageDataScopeRun20190729160604(1).csv"),
+            addDirectory(path, "tempScopeRunData20190729161749.csv")).getOutput()
     
     run = int(strRun)
     startTime = time.time()
