@@ -20,15 +20,12 @@ from simulation import Simulator
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: int,
-                   filepath: str, datetime: str, strRun: str, runSimulation: int):
+                   filepath: str, datetime: str, run: int, runSimulation: int):
     if runSimulation:
-        strRun = str(int(strRun) + 1)
         path = os.path.dirname(__file__)
         return Simulator(
             addDirectory(path, "voltageDataScopeRun20190729160604(1).csv"),
             addDirectory(path, "tempScopeRunData20190729161749.csv")).getOutput()
-    
-    run = int(strRun)
     startTime = time.time()
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
@@ -138,14 +135,13 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
             output[j].append((timesForScopeData, voltageData[i][j]))
     timeSeriesOpsens = [PERIOD*i for i in range(len(tempData))]
     while len(timeSeriesOpsens) < len(timesForScopeData):
-        timeSeriesOpsens.append(0.01)
-        tempData.append(0.01)
+        timeSeriesOpsens.append(0.0)
+        tempData.append(0.0)
     tempDataLabview = []
     for i in range(numCollects):
         tempDataLabview.append((timeSeriesOpsens, tempData))
     output.append(tempDataLabview)
     """Return list to LabView Graphic Component"""
-    strRun = str(run + 1)
     return output
 
 
