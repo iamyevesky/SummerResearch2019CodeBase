@@ -15,17 +15,11 @@ import os
 import xlsxwriter
 import queue
 from threading import Thread
-from simulation import Simulator
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: int,
                    filepath: str, datetime: str, run: int, runSimulation: int):
-    if runSimulation:
-        path = os.path.dirname(__file__)
-        return Simulator(
-            addDirectory(path, "voltageDataScopeRun20190729160604(1).csv"),
-            addDirectory(path, "tempScopeRunData20190729161749.csv")).getOutput()
     startTime = time.time()
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
@@ -87,13 +81,16 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     scope.close()
     voltageData = que.get()
     tempData = que.get()
-    dfVoltageData = pd.DataFrame()
-
-    dfTempData = pd.DataFrame()
-    dfVoltageData['Time'] = timesForScopeData
+    dictVoltageData = {}
+    
     for i in range(numCollects):
+        df = pd.DataFrame()
+        df['Time'] = timesForScopeData
         for j in range(numChan):
-            dfVoltageData['Cycle' + str(i) + 'Channel' + str(j)] = voltageData[i][j]
+            df['Voltage(CH'+(j + 1)+')'] = voltageData[i][j]
+        dictVoltageData["voltageDataScopeRun("+i+")CollectionKind("+run+")"+datetime] = df 
+    
+    dfTempData = pd.DataFrame()
     dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
     dfTempData['Temperature'] = tempData
     runStartTimeRelative = []
@@ -118,13 +115,13 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Generating .csv files from pd.DataFrame() objects"""
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
-    scopeVoltage = addDirectory(scopeFilePath, 'VoltageDataRun('+str(run)+').csv')
+    for key in dictVoltageData:
+        dictVoltageData[key].to_csv(Path(addDirectory(scopeFilePath, key+'.csv')), index=False)
+    
     timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + '.csv')
     cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + '.csv')
     timeVTemp = Path(timeVTemp)
     cycleVTemp = Path(cycleVTemp)
-    scopeVoltage = Path(scopeVoltage)
-    dfVoltageData.to_csv(scopeVoltage, index=False)
     dfRunTemp.to_csv(cycleVTemp, index=False)
     dfTempData.to_csv(timeVTemp, index=False)
 
@@ -246,14 +243,15 @@ def readOpsens(ser: serial.Serial, nTimes: int, startTime):
     ser.write(unicodestring.encode("ascii"))
     startTime.append(time.time())
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
-
-    # Remove unnecessary info in output
-    removeMisc = ['\4', 'CH1', '']
-    for y in range(len(removeMisc)):
-        while removeMisc[y] in rawData:
-            rawData.remove(removeMisc[y])
+    output = []
+    
+    for i in range(len(rawData)):
+        try:
+            output.append(float(rawData[i]))
+        except:
+            pass
     ser.close()
-    return rawData
+    return output
 
 
 def readDataFromChannel(scope, numchan, waitTime):
@@ -760,8 +758,6 @@ def addDirectory(iPath, newPath):
     if not os.path.exists(iPath):
         os.mkdir(iPath)
     return iPath + '\\' + newPath
-
-mainForAmbrell(0,0,0,0,0,0,"","","0",1)
 
 """Legacy code for checkscale function. Do not delete. """
 
