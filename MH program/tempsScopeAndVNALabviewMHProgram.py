@@ -21,7 +21,7 @@ from multiprocessing import Process, Queue
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: int,
                    filepath: str, datetime: str, run: int, runSimulation: int):
-    startTime = time.time()
+    startTime = time.perf_counter()
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -79,19 +79,19 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     
     """Setting up multi-processing"""
     que = Queue()
-    threads_list = list()
-    thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
-                      args=(que, scope, numCollects, numChan, startTimeVoltage))
-    threads_list.append(thread1)
-    thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
-                      args=(que, ser, ntimes, startTimeOpsens))
-    threads_list.append(thread2)
+    processes_list = list()
+    process1 = Process(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
+                      args=(que, scope, numCollects, numChan, startTimeVoltage,))
+    processes_list.append(process1)
+    process2 = Process(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
+                      args=(que, ser, ntimes, startTimeOpsens,))
+    processes_list.append(process2)
 
-    for thread in threads_list:
-        thread.start()
+    for process in processes_list:
+        process.start()
 
-    for thread in threads_list:
-        thread.join()
+    for process in processes_list:
+        process.join()
 
     """Data manipulation"""
     timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
@@ -258,7 +258,7 @@ def get_dt(scope):
 def readOpsens(ser: serial.Serial, nTimes: int, startTime):
     unicodestring = "measure:start " + str(nTimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
-    startTime.append(time.time())
+    startTime.append(time.perf_counter())
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
     output = []
     
@@ -277,7 +277,7 @@ def readDataFromChannel(scope, numchan, waitTime):
     scope.write('DATA:STOP ' + str(record_length))
     scope.write('acquire:stopafter sequence')
     voltage = [i for i in range(numchan)]
-    startRunTime = time.time()
+    startRunTime = time.perf_counter()
     i: int
     for i in range(numchan):
         set_channel(scope, i + 1)
