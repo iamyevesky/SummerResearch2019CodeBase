@@ -13,8 +13,9 @@ import csv
 from pathlib import Path
 import os
 import xlsxwriter
-import queue
+# import queue
 from threading import Thread
+from multiprocessing import Process, Queue
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
@@ -60,14 +61,30 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     startTimeVoltage = []
     startTimeOpsens = []
 
-    """Setting up multi-threading"""
-    que = queue.Queue()
+    # """Setting up multi-threading"""
+    # que = queue.Queue()
+    # threads_list = list()
+    # thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
+    #                  args=(que, scope, numCollects, numChan, startTimeVoltage))
+    # threads_list.append(thread1)
+    # thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
+    #                  args=(que, ser, ntimes, startTimeOpsens))
+    # threads_list.append(thread2)
+
+    # for thread in threads_list:
+    #     thread.start()
+
+    # for thread in threads_list:
+    #     thread.join()
+    
+    """Setting up multi-processing"""
+    que = Queue()
     threads_list = list()
     thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
-                     args=(que, scope, numCollects, numChan, startTimeVoltage))
+                      args=(que, scope, numCollects, numChan, startTimeVoltage))
     threads_list.append(thread1)
     thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
-                     args=(que, ser, ntimes, startTimeOpsens))
+                      args=(que, ser, ntimes, startTimeOpsens))
     threads_list.append(thread2)
 
     for thread in threads_list:
