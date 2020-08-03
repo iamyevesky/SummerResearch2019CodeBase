@@ -13,8 +13,7 @@ import csv
 from pathlib import Path
 import os
 import xlsxwriter
-# import queue
-from threading import Thread
+from typing import List
 from multiprocessing import Process, Queue
 
 
@@ -22,45 +21,12 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
                    numChan: int, freq: int, runCheckScale: int,
                    filepath: str, datetime: str, run: int, runSimulation: int):
     startTime = time.perf_counter()
-    """Setting up oscilloscope"""
-    rm = pyvisa.highlevel.ResourceManager()
-    # Visa address for Tektronik Osciloscope
-    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
-
-    scope = rm.open_resource(visa_address)
-    # Open channels
-    if numChan < 2:
-        scope.write(":SELECT:CH1 on")
-    elif numChan < 3:
-        scope.write(":SELECT:CH1 on")
-        scope.write(":SELECT:CH2 on")
-    elif numChan < 4:
-        scope.write(":SELECT:CH1 on")
-        scope.write(":SELECT:CH2 on")
-        scope.write(":SELECT:CH3 on")
-
-    # Encodes oscilloscope data into ASCII format
-    scope.write(":DATA:ENCDG ASCII")
-    scope.write('Data:width 2')
-
-    # Automatically set scale
-    hScale = 1 / freq
-    scope.write(":Horizontal:Scale " + str(hScale))
-    if runCheckScale:
-        checkscale(scope, numChan, shortRecordLength)
-    scope.write(':Horizontal:Recordlength ' + str(longRecordLength))
-
-    """Setting up thermometer"""
-    PERIOD = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
-    SECONDS_FOR_EACH_COLLECTION = 2.00  # Value can be varied if necessary to capture more data points
-    dataPointsForEachScopeRun = SECONDS_FOR_EACH_COLLECTION / PERIOD
-    ntimes = numCollects * int(dataPointsForEachScopeRun)
-    ser = serial.Serial("COM3", 9600, timeout=((ntimes * PERIOD) + 2))
 
     """Values that extract start times for threads"""
     startTimeVoltage = []
     startTimeOpsens = []
-
+    PERIOD = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
+    
     # """Setting up multi-threading"""
     # que = queue.Queue()
     # threads_list = list()
@@ -78,13 +44,15 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     #     thread.join()
     
     """Setting up multi-processing"""
-    que = Queue()
+    voltageQueue = Queue()
+    tempQueue = Queue()
     processes_list = list()
-    process1 = Process(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
-                      args=(que, scope, numCollects, numChan, startTimeVoltage,))
+    process1 = Process(target=voltageProcess,
+                      args=(voltageQueue, numCollects, numChan, freq, runCheckScale,
+                            longRecordLength, shortRecordLength, startTimeVoltage))
     processes_list.append(process1)
-    process2 = Process(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
-                      args=(que, ser, ntimes, startTimeOpsens,))
+    process2 = Process(target=tempProcess,
+                      args=(tempQueue, numCollects, PERIOD, startTimeOpsens))
     processes_list.append(process2)
 
     for process in processes_list:
@@ -94,10 +62,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         process.join()
 
     """Data manipulation"""
-    timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
-    scope.close()
-    voltageData = que.get()
-    tempData = que.get()
+    voltageData, timesForScopeData = voltageQueue.get()
+    tempData = tempQueue.get()
     dictVoltageData = {}
     
     for i in range(numCollects):
@@ -158,6 +124,11 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Return list to LabView Graphic Component"""
     return output
 
+def voltageProcess(q, arg1, arg2, arg3, arg4, arg5, arg6, arg7):
+    q.put(readScope(arg1, arg2, arg3, arg4, arg5, arg6, arg7))
+
+def tempProcess(q, arg1, arg2, arg3):
+    q.put(readOpsens(arg1, arg2, arg3))
 
 def vnaRead(numTimes, start, end):
     numRecord = numTimes
@@ -214,10 +185,38 @@ def get_time(scope, record_length):
     return times
 
 
-def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
-              numCollects: int,
-              numChan: int,
+def readScope(numCollects: int, numChan: int, freq: float, runCheckScale: bool,
+              shortRecordLength: int, longRecordLength: int,
               startTimes: list):
+    """Setting up oscilloscope"""
+    rm = pyvisa.highlevel.ResourceManager()
+    # Visa address for Tektronik Osciloscope
+    visa_address = 'USB::0x0699::0x0408::C043120::INSTR'
+
+    scope = rm.open_resource(visa_address)
+    # Open channels
+    if numChan < 2:
+        scope.write(":SELECT:CH1 on")
+    elif numChan < 3:
+        scope.write(":SELECT:CH1 on")
+        scope.write(":SELECT:CH2 on")
+    elif numChan < 4:
+        scope.write(":SELECT:CH1 on")
+        scope.write(":SELECT:CH2 on")
+        scope.write(":SELECT:CH3 on")
+
+    # Encodes oscilloscope data into ASCII format
+    scope.write(":DATA:ENCDG ASCII")
+    scope.write('Data:width 2')
+
+    # Automatically set scale
+    hScale = 1 / freq
+    scope.write(":Horizontal:Scale " + str(hScale))
+    if runCheckScale:
+        checkscale(scope, numChan, shortRecordLength)
+    scope.write(':Horizontal:Recordlength ' + str(longRecordLength))
+    
+    
     output = []
     pause = 0  # Pause can be increased if errors occur in data acquisition
     waitTime = calc_wait_time(scope)
@@ -226,7 +225,9 @@ def readScope(scope: pyvisa.highlevel.ResourceManager().open_resource,
         output += [outputTuple[0]]
         startTimes.append(outputTuple[1])
         time.sleep(pause)
-    return output
+    timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
+    scope.close()
+    return output, timesForScopeData
 
 
 """
@@ -255,11 +256,19 @@ def get_dt(scope):
     return xincr
 
 
-def readOpsens(ser: serial.Serial, nTimes: int, startTime):
-    unicodestring = "measure:start " + str(nTimes) + "\n"
+def readOpsens(numCollects: int, period: float, startTime: List[float]):
+    """Setting up thermometer"""
+    PERIOD = period
+    SECONDS_FOR_EACH_COLLECTION = 2.00  # Value can be varied if necessary to capture more data points
+    dataPointsForEachScopeRun = SECONDS_FOR_EACH_COLLECTION / PERIOD
+    ntimes = numCollects * int(dataPointsForEachScopeRun)
+    ser = serial.Serial("COM3", 9600, timeout=((ntimes * PERIOD) + 2))
+    
+    
+    unicodestring = "measure:start " + str(ntimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
     startTime.append(time.perf_counter())
-    rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
+    rawData = ser.read(ntimes * 10).decode("ascii").split('\n')
     output = []
     
     for i in range(len(rawData)):
