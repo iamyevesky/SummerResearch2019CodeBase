@@ -61,13 +61,14 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     startTimeOpsens = []
 
     """Setting up multi-threading"""
-    que = queue.Queue()
+    voltageQue = queue.Queue()
+    tempQue = queue.Queue()
     threads_list = list()
     thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
-                     args=(que, scope, numCollects, numChan, startTimeVoltage))
+                     args=(voltageQue, scope, numCollects, numChan, startTimeVoltage))
     threads_list.append(thread1)
     thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
-                     args=(que, ser, ntimes, startTimeOpsens))
+                     args=(tempQue, ser, ntimes, startTimeOpsens))
     threads_list.append(thread2)
 
     for thread in threads_list:
@@ -79,8 +80,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Data manipulation"""
     timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
     scope.close()
-    voltageData = que.get()
-    tempData = que.get()
+    voltageData = voltageQue.get()
+    tempData = tempQue.get()
     dictVoltageData = {}
     
     for i in range(numCollects):
