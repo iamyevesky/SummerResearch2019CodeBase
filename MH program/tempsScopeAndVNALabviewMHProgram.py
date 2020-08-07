@@ -20,7 +20,7 @@ from threading import Thread
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
                    numChan: int, freq: int, runCheckScale: int,
                    filepath: str, datetime: str, run: int, runSimulation: int):
-    startTime = time.time()
+    startTime = time.pref_counter()
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -241,7 +241,7 @@ def get_dt(scope):
 def readOpsens(ser: serial.Serial, nTimes: int, startTime):
     unicodestring = "measure:start " + str(nTimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
-    startTime.append(time.time())
+    startTime.append(time.pref_counter())
     rawData = ser.read(nTimes * 10).decode("ascii").split('\n')
     output = []
     
@@ -260,7 +260,7 @@ def readDataFromChannel(scope, numchan, waitTime):
     scope.write('DATA:STOP ' + str(record_length))
     scope.write('acquire:stopafter sequence')
     voltage = [i for i in range(numchan)]
-    startRunTime = time.time()
+    startRunTime = time.pref_counter()
     i: int
     for i in range(numchan):
         set_channel(scope, i + 1)
