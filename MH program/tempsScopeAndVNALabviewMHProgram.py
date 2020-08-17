@@ -88,8 +88,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         df = pd.DataFrame()
         df['Time'] = timesForScopeData
         for j in range(numChan):
-            df['Voltage(CH'+(j + 1)+')'] = voltageData[i][j]
-        dictVoltageData["voltageDataScopeRun"+datetime+"("+str(i)+")CollectionKind"+str(run)] = df 
+            df['Voltage(CH'+ str(j + 1) +')'] = voltageData[i][j]
+        dictVoltageData["voltageDataScopeRun"+datetime+"(" + str(i) + ")CollectionKind" + str(run)] = df 
     
     dfTempData = pd.DataFrame()
     dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
@@ -114,15 +114,15 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfRunTemp['Relative Start Time'] = runStartTimeRelativeVoltage
     
     dfDeltaTime = pd.DataFrame()
-    dfDeltaTime["Program Start Time"] = startTime
-    dfDeltaTime["Opsens Start Time"] = startTimeOpsens[0]
-    dfDeltaTime["Opsens Relative Start Time"] = startTimeOpsens[0] - startTime
+    dfDeltaTime["Program Start Time"] = [startTime]
+    dfDeltaTime["Opsens Start Time"] = [startTimeOpsens[0]]
+    dfDeltaTime["Opsens Relative Start Time"] = [startTimeOpsens[0] - startTime]
     for i in range(numCollects):
-        dfDeltaTime["Voltage Start Time Collection " + str(i)] = startTimeVoltage[i]
-        dfDeltaTime["Voltage Relative Start Time Collection " + str(i)] = startTimeVoltage[i] - startTime
+        dfDeltaTime["Voltage Start Time Collection " + str(i)] = [startTimeVoltage[i]]
+        dfDeltaTime["Voltage Relative Start Time Collection " + str(i)] = [startTimeVoltage[i] - startTime]
     
     """Generating .csv files from pd.DataFrame() objects"""
-    dfDeltaTime.to_csv(Path(addDirectory(filepath, "Time_Comparison.csv")), index=False)
+    dfDeltaTime.to_csv(Path(addDirectory(filepath, "Time_ComparisonRun(" + str(run) + ".)csv"), index=False)
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
     for key in dictVoltageData:
