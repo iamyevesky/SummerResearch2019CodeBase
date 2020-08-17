@@ -112,7 +112,15 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
     dfRunTemp['Temperature'] = runTemp
     dfRunTemp['Relative Start Time'] = runStartTimeRelativeVoltage
-
+    
+    dfDeltaTime = pd.DataFrame()
+    dfDeltaTime["Program Start Time"] = startTime
+    dfDeltaTime["Opsens Start Time"] = startTimeOpsens[0]
+    dfDeltaTime["Opsens Relative Start Time"] = startTimeOpsens[0] - startTime
+    for i in range(numCollects):
+        dfDeltaTime["Voltage Start Time Collection " + str(i)] = startTimeVoltage[i]
+        dfDeltaTime["Voltage Relative Start Time Collection " + str(i)] = startTimeVoltage[i] - startTime
+    
     """Generating .csv files from pd.DataFrame() objects"""
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
