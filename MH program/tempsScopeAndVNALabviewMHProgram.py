@@ -14,7 +14,7 @@ from pathlib import Path
 import os
 import xlsxwriter
 from typing import List
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Manager
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
@@ -26,33 +26,18 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     startTimeVoltage = []
     startTimeOpsens = []
     PERIOD = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
-    
-    # """Setting up multi-threading"""
-    # que = queue.Queue()
-    # threads_list = list()
-    # thread1 = Thread(target=lambda q, arg1, arg2, arg3, arg4: q.put(readScope(arg1, arg2, arg3, arg4)),
-    #                  args=(que, scope, numCollects, numChan, startTimeVoltage))
-    # threads_list.append(thread1)
-    # thread2 = Thread(target=lambda q, arg1, arg2, arg3: q.put(readOpsens(arg1, arg2, arg3)),
-    #                  args=(que, ser, ntimes, startTimeOpsens))
-    # threads_list.append(thread2)
-
-    # for thread in threads_list:
-    #     thread.start()
-
-    # for thread in threads_list:
-    #     thread.join()
-    
+ 
     """Setting up multi-processing"""
-    voltageQueue = Queue()
-    tempQueue = Queue()
+    manager = Manager()
+    voltageQueue = manager.Queue()
+    tempQueue = manager.Queue()
     processes_list = list()
     process1 = Process(target=voltageProcess,
                       args=(voltageQueue, numCollects, numChan, freq, runCheckScale,
-                            longRecordLength, shortRecordLength, startTimeVoltage))
+                            longRecordLength, shortRecordLength, startTimeVoltage,))
     processes_list.append(process1)
     process2 = Process(target=tempProcess,
-                      args=(tempQueue, numCollects, PERIOD, startTimeOpsens))
+                      args=(tempQueue, numCollects, PERIOD, startTimeOpsens,))
     processes_list.append(process2)
 
     for process in processes_list:
