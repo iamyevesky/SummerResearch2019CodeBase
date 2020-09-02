@@ -13,7 +13,6 @@ import csv
 from pathlib import Path
 import os
 import xlsxwriter
-from typing import List
 from multiprocessing import Process, Manager
 
 
@@ -23,8 +22,6 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     startTime = time.perf_counter()
 
     """Values that extract start times for threads"""
-    startTimeVoltage = []
-    startTimeOpsens = []
     PERIOD = 0.02  # This is the period for data collection for the Opsens. Change this value if setup changes.
  
     """Setting up multi-processing"""
@@ -34,21 +31,18 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     processes_list = list()
     process1 = Process(target=voltageProcess,
                       args=(voltageQueue, numCollects, numChan, freq, runCheckScale,
-                            longRecordLength, shortRecordLength, startTimeVoltage,))
+                            longRecordLength, shortRecordLength,))
     processes_list.append(process1)
     process2 = Process(target=tempProcess,
-                      args=(tempQueue, numCollects, PERIOD, startTimeOpsens,))
+                      args=(tempQueue, numCollects, PERIOD,))
     processes_list.append(process2)
 
     for process in processes_list:
         process.start()
 
-    for process in processes_list:
-        process.join()
-
     """Data manipulation"""
-    voltageData, timesForScopeData = voltageQueue.get()
-    tempData = tempQueue.get()
+    voltageData, timesForScopeData, startTimeVoltage = voltageQueue.get()
+    tempData, startTimeOpsens = tempQueue.get()
     dictVoltageData = {}
     
     for i in range(numCollects):
@@ -64,7 +58,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     runStartTimeRelative = []
     runStartTimeRelativeVoltage = []
     for i in range(len(startTimeVoltage)):
-        value = startTimeVoltage[i] - startTimeOpsens[0]
+        value = startTimeVoltage[i] - startTimeOpsens
         if value < 0:
             runStartTimeRelative.append(0)
         else:
@@ -109,11 +103,11 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     """Return list to LabView Graphic Component"""
     return output
 
-def voltageProcess(q, arg1, arg2, arg3, arg4, arg5, arg6, arg7):
-    q.put(readScope(arg1, arg2, arg3, arg4, arg5, arg6, arg7))
+def voltageProcess(q, arg1, arg2, arg3, arg4, arg5, arg6):
+    q.put(readScope(arg1, arg2, arg3, arg4, arg5, arg6))
 
-def tempProcess(q, arg1, arg2, arg3):
-    q.put(readOpsens(arg1, arg2, arg3))
+def tempProcess(q, arg1, arg2):
+    q.put(readOpsens(arg1, arg2))
 
 def vnaRead(numTimes, start, end):
     numRecord = numTimes
@@ -171,8 +165,7 @@ def get_time(scope, record_length):
 
 
 def readScope(numCollects: int, numChan: int, freq: float, runCheckScale: bool,
-              shortRecordLength: int, longRecordLength: int,
-              startTimes: list):
+              shortRecordLength: int, longRecordLength: int):
     """Setting up oscilloscope"""
     rm = pyvisa.highlevel.ResourceManager()
     # Visa address for Tektronik Osciloscope
@@ -203,16 +196,17 @@ def readScope(numCollects: int, numChan: int, freq: float, runCheckScale: bool,
     
     
     output = []
+    startTimes = []
     pause = 0  # Pause can be increased if errors occur in data acquisition
     waitTime = calc_wait_time(scope)
     for j in range(numCollects):
         outputTuple = readDataFromChannel(scope, numChan, waitTime)
-        output += [outputTuple[0]]
+        output.append(outputTuple[0])
         startTimes.append(outputTuple[1])
         time.sleep(pause)
     timesForScopeData = get_time(scope, int(scope.query(':HORIZONTAL:RECORDLENGTH?')))
     scope.close()
-    return output, timesForScopeData
+    return output, timesForScopeData, startTimes
 
 
 """
@@ -241,7 +235,7 @@ def get_dt(scope):
     return xincr
 
 
-def readOpsens(numCollects: int, period: float, startTime: List[float]):
+def readOpsens(numCollects: int, period: float):
     """Setting up thermometer"""
     PERIOD = period
     SECONDS_FOR_EACH_COLLECTION = 2.00  # Value can be varied if necessary to capture more data points
@@ -252,7 +246,7 @@ def readOpsens(numCollects: int, period: float, startTime: List[float]):
     
     unicodestring = "measure:start " + str(ntimes) + "\n"
     ser.write(unicodestring.encode("ascii"))
-    startTime.append(time.perf_counter())
+    startTime = time.perf_counter()
     rawData = ser.read(ntimes * 10).decode("ascii").split('\n')
     output = []
     
@@ -262,7 +256,7 @@ def readOpsens(numCollects: int, period: float, startTime: List[float]):
         except:
             pass
     ser.close()
-    return output
+    return output, startTime
 
 
 def readDataFromChannel(scope, numchan, waitTime):
