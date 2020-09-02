@@ -49,8 +49,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         df = pd.DataFrame()
         df['Time'] = timesForScopeData
         for j in range(numChan):
-            df['Voltage(CH'+(j + 1)+')'] = voltageData[i][j]
-        dictVoltageData["voltageDataScopeRun"+datetime+"("+i+")CollectionKind"+run] = df 
+            df['Voltage(CH'+ str(j + 1) + ')'] = voltageData[i][j]
+        dictVoltageData["voltageDataScopeRun"+datetime+"("+ str(i) +")CollectionKind" + str(run)] = df 
     
     dfTempData = pd.DataFrame()
     dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
@@ -80,8 +80,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     for key in dictVoltageData:
         dictVoltageData[key].to_csv(Path(addDirectory(scopeFilePath, key+'.csv')), index=False)
     
-    timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + "CollectionKind" + run + '.csv')
-    cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + "CollectionKind" + run + '.csv')
+    timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + "CollectionKind" + str(run) + '.csv')
+    cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + "CollectionKind" + str(run) + '.csv')
     timeVTemp = Path(timeVTemp)
     cycleVTemp = Path(cycleVTemp)
     dfRunTemp.to_csv(cycleVTemp, index=False)
