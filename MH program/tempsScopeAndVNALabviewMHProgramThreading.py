@@ -122,7 +122,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         dfDeltaTime["Voltage Relative Start Time Collection " + str(i)] = [startTimeVoltage[i] - startTime]
     
     """Generating .csv files from pd.DataFrame() objects"""
-    dfDeltaTime.to_csv(Path(addDirectory(filepath, "Time_ComparisonRun(" + str(run) + ".)csv"), index=False))
+    dfDeltaTime.to_csv(Path(addDirectory(filepath, "Time_ComparisonRun(" + str(run) + ".)csv")), index=False)
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
     for key in dictVoltageData:
