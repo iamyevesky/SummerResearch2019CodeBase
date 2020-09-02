@@ -75,17 +75,17 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfRunTemp['Relative Start Time'] = runStartTimeRelativeVoltage
 
     """Generating .csv files from pd.DataFrame() objects"""
-    opsensFilePath = addDirectory(filepath, 'Opsens')
-    scopeFilePath = addDirectory(filepath, 'Oscilloscope')
-    for key in dictVoltageData:
-        dictVoltageData[key].to_csv(Path(addDirectory(scopeFilePath, key+'.csv')), index=False)
+    # opsensFilePath = addDirectory(filepath, 'Opsens')
+    # scopeFilePath = addDirectory(filepath, 'Oscilloscope')
+    # for key in dictVoltageData:
+    #     dictVoltageData[key].to_csv(Path(addDirectory(scopeFilePath, key+'.csv')), index=False)
     
-    timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + "CollectionKind" + str(run) + '.csv')
-    cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + "CollectionKind" + str(run) + '.csv')
-    timeVTemp = Path(timeVTemp)
-    cycleVTemp = Path(cycleVTemp)
-    dfRunTemp.to_csv(cycleVTemp, index=False)
-    dfTempData.to_csv(timeVTemp, index=False)
+    # timeVTemp = addDirectory(opsensFilePath, 'tempData' + datetime + "CollectionKind" + str(run) + '.csv')
+    # cycleVTemp = addDirectory(opsensFilePath, 'tempTimeScopeRunData' + datetime + "CollectionKind" + str(run) + '.csv')
+    # timeVTemp = Path(timeVTemp)
+    # cycleVTemp = Path(cycleVTemp)
+    # dfRunTemp.to_csv(cycleVTemp, index=False)
+    # dfTempData.to_csv(timeVTemp, index=False)
 
     """Generating list containing tuples as output for LabView Graphic component"""
     output = [[] for i in range(numChan)]
