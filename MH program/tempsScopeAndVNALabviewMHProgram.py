@@ -125,7 +125,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     
     """Generating .csv files from pd.DataFrame() objects"""
     timeFilePath = addDirectory(filepath, "Time")
-    dfDeltaTime.to_csv(Path(addDirectory(timeFilePath, "Time_ComparisonRun"+ datetime +"(" + str(run) + ").csv")), index=False)
+    dfDeltaTime.to_csv(Path(addDirectory(timeFilePath, "Time_ComparisonRun"+ datetime +"CollectionKind" + str(run) + ".csv")), index=False)
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
     for key in dictVoltageData:
@@ -139,7 +139,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     dfTempData.to_csv(timeVTemp, index=False)
     
     """Gegerating time graph for experiment"""
-    filepathGraph = addDirectory(timeFilePath, "Time_ComparisonRunGraph"+ datetime +"(" + str(run) + ").png")
+    filepathGraph = addDirectory(timeFilePath, "Time_ComparisonRunGraph"+ datetime + "CollectionKind" + str(run) + ".png")
     plotRelativeTime(startTime, startTimeOpsens[0], startTimeVoltage, filepathGraph)
 
     """Generating list containing tuples as output for LabView Graphic component"""
