@@ -10,11 +10,13 @@ import pyvisa
 import serial
 import pandas as pd
 import csv
+import matplotlib as plt
 from pathlib import Path
 import os
 import xlsxwriter
 import queue
 from threading import Thread
+from typing import List
 
 
 def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: int,
@@ -122,7 +124,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         dfDeltaTime["Voltage Relative Start Time Collection " + str(i)] = [startTimeVoltage[i] - startTime]
     
     """Generating .csv files from pd.DataFrame() objects"""
-    dfDeltaTime.to_csv(Path(addDirectory(filepath, "Time_ComparisonRun(" + str(run) + ".)csv")), index=False)
+    timeFilePath = addDirectory(filepath, "Time")
+    dfDeltaTime.to_csv(Path(addDirectory(timeFilePath, "Time_ComparisonRun"+ datetime +"(" + str(run) + ").csv")), index=False)
     opsensFilePath = addDirectory(filepath, 'Opsens')
     scopeFilePath = addDirectory(filepath, 'Oscilloscope')
     for key in dictVoltageData:
@@ -134,6 +137,10 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     cycleVTemp = Path(cycleVTemp)
     dfRunTemp.to_csv(cycleVTemp, index=False)
     dfTempData.to_csv(timeVTemp, index=False)
+    
+    """Gegerating time graph for experiment"""
+    filepathGraph = addDirectory(timeFilePath, "Time_ComparisonRunGraph"+ datetime +"(" + str(run) + ").png")
+    plotRelativeTime(startTime, startTimeOpsens[0], startTimeVoltage, filepathGraph)
 
     """Generating list containing tuples as output for LabView Graphic component"""
     output = [[] for i in range(numChan)]
@@ -152,6 +159,34 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     return output
 
 
+def plotRelativeTime(prgmStartTime: float, opsensStartTime: float, voltageRunStartTimeArray: List[float], filepath: str):
+        programEndTime = time.perf_counter() - prgmStartTime
+        plt.figure()
+        fig, gnt = plt.subplots()
+        yLimit = 2 + len(voltageRunStartTimeArray)
+        yTicks = [(i*10) + 5 for i in range(yLimit)]
+        yTickLabels = ["Program", "Opsens"]
+        for i in range(len(voltageRunStartTimeArray)):
+            yTickLabels.append("VoltageScopeRun " + str(i))
+        
+        gnt.set_ylim(0, 11 * yLimit)
+        gnt.set_xlim(0, programEndTime)
+        gnt.set_xlabel("Seconds since start")
+        gnt.set_ylabel("Processes")
+        
+        gnt.set_yticks(yTicks)
+        gnt.set_yticklabels(yTickLabels)
+        gnt.grid(True)
+        
+        gnt.broken_barh([(0, programEndTime)], (yTicks[0], 5))
+        gnt.broken_barh([(opsensStartTime - prgmStartTime, programEndTime)], (yTicks[1], 5))
+        for i in range(len(voltageRunStartTimeArray)):
+            gnt.broken_bar[(voltageRunStartTimeArray[i] - prgmStartTime, programEndTime), (yTicks[2 + i], 5)]
+        
+        plt.savefig(filepath)
+        
+        
+        
 def vnaRead(numTimes, start, end):
     numRecord = numTimes
     startFreq = start
