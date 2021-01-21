@@ -161,7 +161,6 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
 def plotRelativeTime(prgmStartTime: float, opsensStartTime: float, voltageRunStartTimeArray: List[float], filepath: str):
         programEndTime = time.perf_counter() - prgmStartTime
-        plt.figure()
         fig, gnt = plt.subplots()
         yLimit = 2 + len(voltageRunStartTimeArray)
         yTicks = [(i*10) + 5 for i in range(yLimit)]
@@ -178,12 +177,13 @@ def plotRelativeTime(prgmStartTime: float, opsensStartTime: float, voltageRunSta
         gnt.set_yticklabels(yTickLabels)
         gnt.grid(True)
         
-        gnt.broken_barh([(0, programEndTime)], (yTicks[0], 5))
-        gnt.broken_barh([(opsensStartTime - prgmStartTime, programEndTime)], (yTicks[1], 5))
+        gnt.broken_barh((0, programEndTime), (yTicks[0], 5))
+        gnt.broken_barh((opsensStartTime - prgmStartTime, programEndTime), (yTicks[1], 5))
         for i in range(len(voltageRunStartTimeArray)):
-            gnt.broken_bar[(voltageRunStartTimeArray[i] - prgmStartTime, programEndTime), (yTicks[2 + i], 5)]
+            gnt.broken_bar((voltageRunStartTimeArray[i] - prgmStartTime, programEndTime), (yTicks[2 + i], 5))
         
-        plt.savefig(filepath)
+        fig.savefig(filepath)
+        plt.close()
         
         
         
