@@ -10,7 +10,7 @@ import pyvisa
 import serial
 import pandas as pd
 import csv
-import matplotlib as plt
+import matplotlib.pyplot as plt
 from pathlib import Path
 import os
 import xlsxwriter
@@ -164,9 +164,9 @@ def plotRelativeTime(prgmStartTime: float, opsensStartTime: float, voltageRunSta
         fig, gnt = plt.subplots()
         yLimit = 2 + len(voltageRunStartTimeArray)
         yTicks = [(i*10) + 5 for i in range(yLimit)]
-        yTickLabels = ["Program", "Opsens"]
+        yTickLabels = ["Start", "Opsens"]
         for i in range(len(voltageRunStartTimeArray)):
-            yTickLabels.append("VoltageScopeRun " + str(i))
+            yTickLabels.append("Run " + str(i))
         
         gnt.set_ylim(0, 11 * yLimit)
         gnt.set_xlim(0, programEndTime)
@@ -177,10 +177,10 @@ def plotRelativeTime(prgmStartTime: float, opsensStartTime: float, voltageRunSta
         gnt.set_yticklabels(yTickLabels)
         gnt.grid(True)
         
-        gnt.broken_barh((0, programEndTime), (yTicks[0], 5))
-        gnt.broken_barh((opsensStartTime - prgmStartTime, programEndTime), (yTicks[1], 5))
+        gnt.broken_barh([(0, programEndTime)], (yTicks[0], 5))
+        gnt.broken_barh([(opsensStartTime - prgmStartTime, programEndTime - (opsensStartTime - prgmStartTime))], (yTicks[1], 5))
         for i in range(len(voltageRunStartTimeArray)):
-            gnt.broken_bar((voltageRunStartTimeArray[i] - prgmStartTime, programEndTime), (yTicks[2 + i], 5))
+            gnt.broken_barh([(voltageRunStartTimeArray[i] - prgmStartTime, programEndTime - (voltageRunStartTimeArray[i] - prgmStartTime))], (yTicks[2 + i], 5))
         
         fig.savefig(filepath)
         plt.close()
