@@ -94,8 +94,8 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         dictVoltageData["voltageDataScopeRun"+datetime+"(" + str(i + 1) + ")CollectionKind" + str(run)] = df 
     
     dfTempData = pd.DataFrame()
-    dfTempData['Time'] = [PERIOD*i for i in range(len(tempData))]
-    dfTempData['Temperature'] = tempData
+    dfTempData['Time (s)'] = [PERIOD*i for i in range(len(tempData))]
+    dfTempData['Temperature (°C)'] = tempData
     runStartTimeRelative = []
     runStartTimeRelativeVoltage = []
     for i in range(len(startTimeVoltage)):
@@ -112,16 +112,20 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
-    dfRunTemp['Temperature'] = runTemp
-    dfRunTemp['Relative Start Time'] = runStartTimeRelativeVoltage
+    dfRunTemp['Temperature (°C)'] = runTemp
+    dfRunTemp['Relative Start Time (s)'] = runStartTimeRelativeVoltage
     
     dfDeltaTime = pd.DataFrame()
-    dfDeltaTime["Program Start Time"] = [startTime]
-    dfDeltaTime["Opsens Start Time"] = [startTimeOpsens[0]]
-    dfDeltaTime["Opsens Relative Start Time"] = [startTimeOpsens[0] - startTime]
+    listOfPoints = ["Program Start Time", "Opsens Start Time", "Opsens Relative Start Time"]
+    listOfDataPoints = [startTime, startTimeOpsens[0], startTimeOpsens[0] - startTime]
     for i in range(numCollects):
-        dfDeltaTime["Voltage Start Time Collection " + str(i + 1)] = [startTimeVoltage[i]]
-        dfDeltaTime["Voltage Relative Start Time Collection " + str(i + 1)] = [startTimeVoltage[i] - startTime]
+        listOfPoints.append("Voltage Start Time Collection " + str(i + 1))
+        listOfPoints.append("Voltage Relative Start Time Collection " + str(i + 1))
+        listOfDataPoints.append(startTimeVoltage[i])
+        listOfDataPoints.append(startTimeVoltage[i] - startTime)
+    dfDeltaTime["Data"] = listOfPoints
+    dfDeltaTime = ["Time (s)"] = listOfDataPoints
+    
     
     """Generating .csv files from pd.DataFrame() objects"""
     timeFilePath = addDirectory(filepath, "Time")
