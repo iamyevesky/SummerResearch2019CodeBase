@@ -88,14 +88,14 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
     
     for i in range(numCollects):
         df = pd.DataFrame()
-        df['Time'] = timesForScopeData
+        df['Time (s)'] = timesForScopeData
         for j in range(numChan):
-            df['Voltage(CH'+ str(j + 1) +')'] = voltageData[i][j]
+            df['Voltage(CH'+ str(j + 1) +') (V)'] = voltageData[i][j]
         dictVoltageData["voltageDataScopeRun"+datetime+"(" + str(i + 1) + ")CollectionKind" + str(run)] = df 
     
     dfTempData = pd.DataFrame()
     dfTempData['Time (s)'] = [PERIOD*i for i in range(len(tempData))]
-    dfTempData['Temperature (°C)'] = tempData
+    dfTempData['Temperature (C)'] = tempData
     runStartTimeRelative = []
     runStartTimeRelativeVoltage = []
     for i in range(len(startTimeVoltage)):
@@ -112,7 +112,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
-    dfRunTemp['Temperature (°C)'] = runTemp
+    dfRunTemp['Temperature (C)'] = runTemp
     dfRunTemp['Relative Start Time (s)'] = runStartTimeRelativeVoltage
     
     dfDeltaTime = pd.DataFrame()
