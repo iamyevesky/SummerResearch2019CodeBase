@@ -124,7 +124,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
         listOfDataPoints.append(startTimeVoltage[i])
         listOfDataPoints.append(startTimeVoltage[i] - startTime)
     dfDeltaTime["Data"] = listOfPoints
-    dfDeltaTime = ["Time (s)"] = listOfDataPoints
+    dfDeltaTime["Time (s)"] = listOfDataPoints
     
     
     """Generating .csv files from pd.DataFrame() objects"""
