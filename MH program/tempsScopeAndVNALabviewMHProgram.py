@@ -108,7 +108,7 @@ def mainForAmbrell(shortRecordLength: int, longRecordLength: int, numCollects: i
 
     runTemp = []
     for i in range(len(runStartTimeRelative)):
-        runTemp.append(dfTempData.iloc[int(runStartTimeRelative[i] / PERIOD)]['Temperature'])
+        runTemp.append(dfTempData.iloc[int(runStartTimeRelative[i] / PERIOD)]['Temperature (C)'])
 
     dfRunTemp = pd.DataFrame()
     dfRunTemp['Run'] = [i + 1 for i in range(len(runTemp))]
